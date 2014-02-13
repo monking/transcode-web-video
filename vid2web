@@ -32,7 +32,7 @@ will give you:
   exit 0
 fi
 
-cd `dirname $input`
+cd `dirname "$input"`
 
 if [ -z "$size" ]; then
   size=640x360
@@ -52,7 +52,7 @@ if [ -z "$thumb" ]; then
 fi
 
 if [ -z "$output" ]; then
-  output=$input
+  output="$input"
 fi
 
 mkdir -p `dirname $output`
