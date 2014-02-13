@@ -1,27 +1,28 @@
-Transcode Web Video
-===================
+Vid2Web
+=======
 
 Transcode videos of any format into MP4, OGV, and WebM.
 
 Installation
 ------------
 
-Move the `transcode-web-video` folder to someplace permanent. Open Terminal and do:
+On Mac, use [homebrew](http://brew.sh/) to install ffmpeg with the necessary codecs:
+
+    brew uninstall ffmpeg
+    brew install --with-theora --with-libvorbis --with-libvpx --with-webm ffmpeg
+
+Move the this folder to someplace permanent, such as your Documents folder. Open Terminal and do:
 
     mkdir -p ~/bin
-    ln -s <path-to-vid2web> ~/bin/
+    ln -s ~/Documents/transcode-web-video/vid2web ~/bin/
     echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
 
 Usage
 -----
 
-`vid2web -i <filename> [ -o <filename> ] [ -s <width>x<height ] [ -b <kbps> ] [ -t <mm>:<ss> ]`
-
-For example:
-
     vid2web -i source.mov -o compressed/output -s 720x480 -t 0:30
 
-will give you the following files, in a new folder `compressed`:
+will give you the following files, in a new folder called `compressed`:
 
     compressed/
     | output.mp4
