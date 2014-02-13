@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# on Mac:
+# brew install --with-theora --with-libvorbis --with-libvpx --with-webm ffmpeg
+
+while getopts "i:o:s:b:x:t:" flag
+do
+  case $flag in
+    i ) input=$OPTARG;;
+    o ) output=$OPTARG;;
+    s ) size=$OPTARG;;
+    b ) krate=$OPTARG;;
+    # this option is disabled, because it gives terrible results. Maybe it needs to be set in conjunction with -b?
+    # x ) limitsize=$OPTARG;;
+    t ) thumb=$OPTARG;;
+  esac
+done
+shift $((OPTIND-1)); OPTIND=1
+
+if [ -z "$input" ]; then
+  # if -x is re-instated:
+  # echo "USAGE: `basename $0` -i <filename> [ -o <filename> ] [ -s <width>x<height ] [ -b <bitrate> | -x <limit_size> ] [ -t <mm>:<ss> ]
+  echo "USAGE: `basename $0` -i <filename> [ -o <filename> ] [ -s <width>x<height ] [ -b <bitrate> ] [ -t <mm>:<ss> ]
+
+For example:
+  `basename $0` -i source.mov -o compressed/output -s 720x480 -t 0:30
+will give you:
+  compressed/
+  | output.mp4
+  | output.ogv
+  | output.webm"
+  exit 0
+fi
+
+cd `dirname $input`
+
+if [ -z "$size" ]; then
+  size=640x360
+fi
+
+if [ -z "$limitsize" -a -z "$krate" ]; then
+  krate=1500k
+fi
+if [ -n "$limitsize" ]; then
+  fileoptions="-fs $limitsize"
+else
+  fileoptions="-b $krate"
+fi
+
+if [ -z "$thumb" ]; then
+  thumb="00:10"
+fi
+
+if [ -z "$output" ]; then
+  output=$input
+fi
+
+mkdir -p `dirname $output`
+
+output="$(dirname $output)/$(basename $output)"
+motion="-g 30"
+
+# adapted from a Windows batch file: http://johndyer.name/ffmpeg-settings-for-html5-codecs-h264mp4-theoraogg-vp8webm/
+
+echo "mp4  (H.264 / ACC)"
+# ffmpeg -i "$input" $fileoptions -c:v libx264 -vpre slow -vpre baseline                                           $motion -s $size "$output.mp4"
+ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion -s $size /dev/null
+ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion -s $size "$output.mp4"
+
+echo "webm (VP8 / Vorbis)"
+ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion -s $size "$output.webm"
+
+echo "ogv  (Theora / Vorbis)"
+ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion -s $size "$output.ogv"
+
+echo "jpeg (screenshot at $thumb)"
+
+ffmpeg -i "$input" -ss $thumb -vframes 1 -r 1 -s $size -f image2 "$output.jpg"
