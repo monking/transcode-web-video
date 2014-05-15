@@ -23,6 +23,13 @@ Open Terminal and do:
 Usage
 -----
 
+On Mac OS 10.9.x (Mavericks), the script is complaining of issues with the
+codecs. Until this is fixed, use the `-p` option with this format:
+
+    vid2web -p <input file> <output directory>
+
+On compatible systems, usage is:
+
     vid2web -i source.mov -o compressed/output -s 720x480 -g 30
 
 will give you the following files, in a new folder called `compressed`:
