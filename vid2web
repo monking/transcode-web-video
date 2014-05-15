@@ -4,9 +4,10 @@
 # brew install --with-theora --with-libvorbis --with-libvpx --with-webm ffmpeg
 # brew install mplayer
 
-while getopts "i:o:s:b:q:x:g:G:a:" flag
+while getopts "pi:o:s:b:q:x:g:G:a:" flag
 do
   case $flag in
+    p ) patch=y;;
     i ) inputFiles=$OPTARG;;
     o ) outputDir=$OPTARG;;
     s ) size=$OPTARG;;
@@ -20,7 +21,37 @@ do
 done
 shift $((OPTIND-1)); OPTIND=1
 
-if [ -z "$inputFiles" ]; then
+if [[ y = $patch ]]; then
+  input=$1
+  output=$2
+  if [[ -z $input$output ]]; then
+    echo "USAGE: vid2web -p <input file> <output directory>"
+    exit 1
+  fi
+  if [[ -d $output ]]; then
+    outputdir=$output
+    outputname=$(basename $input)
+  else
+    outputdir=$(dirname $output)
+    outputname=$(basename $output)
+  fi
+  outputname=${outputname%.*}
+
+  ffmpeg -i $input -c:v libx264 -f mp4 $outputdir/$outputname.mp4
+  ffmpeg -i $input -b:v 1300k -c:v libtheora  $outputdir/$outputname.ogv
+  ffmpeg -i $input -b:v 1000k -c:v libvpx  $outputdir/$outputname.webm
+  exit 0
+else
+  cat << EOF
+###
+# WARNING: This script isn't working in Mac OS 10.9.x Mavericks.
+#          Use the -p option in the meantime.
+###
+EOF
+
+fi
+
+if [[ -z $inputFiles ]]; then
   echo "USAGE: `basename $0` -i <filename> [ -o <directory> ] [ -s <width>x<height ] [ -b <bitrate> | -x <limit_size> ] [ -a x:y ] [ -g <ss> | -g +<ss> | -g x<count> ]
 
 For example:
@@ -37,23 +68,23 @@ fi
 
 function pad {
   local len str pad
-  if [ -n "$1" ]; then
+  if [[ -n $1 ]]; then
     len=$1
   else
     return 0
   fi
-  if [ -n "$2" ]; then
+  if [[ -n $2 ]]; then
     str="$2"
   else
     str=""
   fi
-  if [ -n "$3" ]; then
+  if [[ -n $3 ]]; then
     pad="$3"
   else
     pad=" "
   fi
   padAmt=$(($len - ${#str}))
-  if [ $padAmt -gt 0 ]; then
+  if [[ $padAmt -gt 0 ]]; then
     for i in $(eval echo \{1..$padAmt\}); do
       echo -n "$pad"
     done
@@ -65,40 +96,40 @@ for input in $inputFiles; do
 
   cd `dirname "$input"`
 
-  if [ -n "$size" ]; then
+  if [[ -n $size ]]; then
     sizeoption="-s $size"
     # read width height <<< `echo $size | sed 's/x/ /'`
     # filters="crop=$width:$height"
   fi
 
-  if [ -z "$quality" ]; then
+  if [[ -z $quality ]]; then
     quality=70
   fi
   qualityoption="-qscale $(((100-100) * 10 / 33 + 1))"
 
-  if [ -z "$limitsize" -a -z "$bitrate" -a -z "$quality" ]; then
+  if [[ -z $limitsize && -z $bitrate && -z $quality ]]; then
     bitrate=1500k
   fi
-  if [ -n "$limitsize" ]; then
+  if [[ -n $limitsize ]]; then
     fileoptions="-fs $limitsize"
   else
     fileoptions="-b $bitrate"
   fi
 
-  if [ -n "$filters" ]; then
+  if [[ -n $filters ]]; then
     vf="-vf \"$filters\""
   fi
 
-  if [ -z "$screengrab" ]; then
+  if [[ -z $screengrab ]]; then
     screengrab=0
   fi
 
   videoLength=$(mplayer -identify -frames 0 -vo null -nosound $input 2>&1 | awk -F= '/LENGTH/{print $2}')
   videoLength=$(printf "%.0f" $videoLength)
-  if [ 'x' = "${screengrab::1}" ]; then # capture this many images from the video, spaced equally
+  if [[ x = "${screengrab::1}" ]]; then # capture this many images from the video, spaced equally
     grabLimit=${screengrab:1}
     grabInterval=$(($videoLength / $grabLimit))
-  elif [ '+' = "${screengrab::1}" ]; then # capture images every n seconds
+  elif [[ '+' = "${screengrab::1}" ]]; then # capture images every n seconds
     grabInterval=${screengrab:1}
     grabLimit=$((videoLength / $grabInterval))
   else # capture just one image, at the given time
@@ -106,7 +137,7 @@ for input in $inputFiles; do
     grabInterval=$screengrab
   fi
 
-  if [ -z "$outputDir" ]; then
+  if [[ -z $outputDir ]]; then
     outputDir="$(dirname "$input")/vid2web"
   else
     outputDir="$(dirname "$outputDir")/$(basename "$outputDir")"
@@ -125,7 +156,7 @@ for input in $inputFiles; do
   echo "jpeg ($grabLimit screengrabs ${grabInterval} seconds apart)"
 
   for ((n=0;n<$grabLimit;n++)); do
-    if [ $grabLimit -gt 1 ]; then
+    if [[ $grabLimit -gt 1 ]]; then
       count="_$(pad 4 $(($n + 1)) 0)"
     else
       count=
@@ -133,16 +164,16 @@ for input in $inputFiles; do
     ffmpeg -i "$input" -ss $(($n * $grabInterval)) -vframes 1 -r 1 $sizeoption $vf -f image2 "$output$count.jpg" # DEBUG
   done
 
-  if [ 'yes' != "$grabOnly" ]; then
+  if [[ yes != $grabOnly ]]; then
     echo "mp4  (H.264 / ACC)"
     # ffmpeg -i "$input" $fileoptions -c:v libx264 -vpre slow -vpre baseline                                           $motion $qualityoption $sizeoption $vf "$output.mp4"
-    ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
-    ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
+    echo ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
+    echo ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
 
     echo "webm (VP8 / Vorbis)"
-    ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
+    echo ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
 
     echo "ogv  (Theora / Vorbis)"
-    ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
+    echo ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
   fi
 done
