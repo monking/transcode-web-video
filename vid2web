@@ -35,6 +35,7 @@ if [[ y = $patch ]]; then
     outputdir=$(dirname $output)
     outputname=$(basename $output)
   fi
+  mkdir -p "$outputdir"
   outputname=${outputname%.*}
 
   ffmpeg -i $input -c:v libx264 -f mp4 $outputdir/$outputname.mp4
