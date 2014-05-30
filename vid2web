@@ -7,7 +7,6 @@
 while getopts "pi:o:s:b:q:x:g:G:a:" flag
 do
   case $flag in
-    p ) patch=y;;
     i ) inputFiles=$OPTARG;;
     o ) outputDir=$OPTARG;;
     s ) size=$OPTARG;;
@@ -20,37 +19,6 @@ do
   esac
 done
 shift $((OPTIND-1)); OPTIND=1
-
-if [[ y = $patch ]]; then
-  input=$1
-  output=$2
-  if [[ -z $input$output ]]; then
-    echo "USAGE: vid2web -p <input file> <output directory>"
-    exit 1
-  fi
-  if [[ -d $output ]]; then
-    outputdir=$output
-    outputname=$(basename $input)
-  else
-    outputdir=$(dirname $output)
-    outputname=$(basename $output)
-  fi
-  mkdir -p "$outputdir"
-  outputname=${outputname%.*}
-
-  ffmpeg -i $input -c:v libx264 -f mp4 $outputdir/$outputname.mp4
-  ffmpeg -i $input -b:v 1300k -c:v libtheora  $outputdir/$outputname.ogv
-  ffmpeg -i $input -b:v 1000k -c:v libvpx  $outputdir/$outputname.webm
-  exit 0
-else
-  cat << EOF
-###
-# WARNING: This script isn't working in Mac OS 10.9.x Mavericks.
-#          Use the -p option in the meantime.
-###
-EOF
-
-fi
 
 if [[ -z $inputFiles ]]; then
   echo "USAGE: `basename $0` -i <filename> [ -o <directory> ] [ -s <width>x<height ] [ -b <bitrate> | -x <limit_size> ] [ -a x:y ] [ -g <ss> | -g +<ss> | -g x<count> ]
@@ -168,13 +136,13 @@ for input in $inputFiles; do
   if [[ yes != $grabOnly ]]; then
     echo "mp4  (H.264 / ACC)"
     # ffmpeg -i "$input" $fileoptions -c:v libx264 -vpre slow -vpre baseline                                           $motion $qualityoption $sizeoption $vf "$output.mp4"
-    echo ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
-    echo ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
+    ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
+    ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
 
-    echo "webm (VP8 / Vorbis)"
-    echo ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
+    "webm (VP8 / Vorbis)"
+    ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
 
-    echo "ogv  (Theora / Vorbis)"
-    echo ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
+    "ogv  (Theora / Vorbis)"
+    ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
   fi
 done
