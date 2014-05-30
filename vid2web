@@ -4,7 +4,7 @@
 # brew install --with-theora --with-libvorbis --with-libvpx --with-webm ffmpeg
 # brew install mplayer
 
-while getopts "pi:o:s:b:q:x:g:G:a:" flag
+while getopts "i:o:s:b:q:x:g:G:a:" flag
 do
   case $flag in
     i ) inputFiles=$OPTARG;;
@@ -71,10 +71,9 @@ for input in $inputFiles; do
     # filters="crop=$width:$height"
   fi
 
-  if [[ -z $quality ]]; then
-    quality=70
+  if [[ -n $quality ]]; then
+    qualityoption="-qscale $(((100-100) * 10 / 33 + 1))"
   fi
-  qualityoption="-qscale $(((100-100) * 10 / 33 + 1))"
 
   if [[ -z $limitsize && -z $bitrate && -z $quality ]]; then
     bitrate=1500k
@@ -139,10 +138,10 @@ for input in $inputFiles; do
     ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
     ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
 
-    "webm (VP8 / Vorbis)"
+    echo "webm (VP8 / Vorbis)"
     ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
 
-    "ogv  (Theora / Vorbis)"
+    echo "ogv  (Theora / Vorbis)"
     ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
   fi
 done
