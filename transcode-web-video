@@ -21,7 +21,10 @@ done
 shift $((OPTIND-1)); OPTIND=1
 
 if [[ -z $inputFiles ]]; then
-  echo "USAGE: `basename $0` -i <filename> [ -o <directory> ] [ -s <width>x<height ] [ -b <bitrate> | -x <limit_size> ] [ -a x:y ] [ -g <ss> | -g +<ss> | -g x<count> ]
+  echo "USAGE: `basename $0` [ -o <directory> ] [ -s <width>x<height ]
+  [ -b <bitrate> | -x <limit_size> ] [ -a x:y ]
+  [ -g <ss> | -g +<ss> | -g x<count> ]
+  <input_filename>
 
 For example:
   `basename $0` -i video.mov -o compressed/ -s 720x480 -g 0:30
