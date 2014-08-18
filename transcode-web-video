@@ -4,10 +4,13 @@
 # brew install --with-theora --with-libvorbis --with-libvpx --with-webm ffmpeg
 # brew install mplayer
 
-while getopts "i:o:s:b:q:x:g:G:a:" flag
+##
+# options
+##
+
+while getopts "o:s:b:q:x:g:G:a:" flag
 do
   case $flag in
-    i ) inputFiles=$OPTARG;;
     o ) outputDir=$OPTARG;;
     s ) size=$OPTARG;;
     b ) bitrate=$OPTARG;;
@@ -20,23 +23,33 @@ do
 done
 shift $((OPTIND-1)); OPTIND=1
 
-if [[ -z $inputFiles ]]; then
+input=$1
+
+##
+# documentation
+##
+
+if [[ -z $input ]]; then
   echo "USAGE: `basename $0` [ -o <directory> ] [ -s <width>x<height ]
   [ -b <bitrate> | -x <limit_size> ] [ -a x:y ]
   [ -g <ss> | -g +<ss> | -g x<count> ]
   <input_filename>
 
 For example:
-  `basename $0` -i video.mov -o compressed/ -s 720x480 -g 0:30
+  `basename $0` -s 1280x720 -g 0:30 video.mov
 will give you:
-  compressed/
-  | video.mp4
-  | video.ogv
-  | video.webm
-
-Escape wildcards in -i, like \*.mp4."
+  ./
+  └── web-ready-video/
+      ├── video.mp4
+      ├── video.ogv
+      └── video.webm
+"
   exit 0
 fi
+
+##
+# utility functions
+##
 
 function pad {
   local len str pad
@@ -64,87 +77,89 @@ function pad {
   echo -n $str
 }
 
-for input in $inputFiles; do
 
-  cd `dirname "$input"`
+##
+# encode the various formats
+##
 
-  if [[ -n $size ]]; then
-    sizeoption="-s $size"
-    # read width height <<< `echo $size | sed 's/x/ /'`
-    # filters="crop=$width:$height"
-  fi
+cd `dirname "$input"`
 
-  if [[ -n $quality ]]; then
-    qualityoption="-qscale $(((100-100) * 10 / 33 + 1))"
-  fi
+if [[ -n $size ]]; then
+  sizeoption="-s $size"
+  # read width height <<< `echo $size | sed 's/x/ /'`
+  # filters="crop=$width:$height"
+fi
 
-  if [[ -z $limitsize && -z $bitrate && -z $quality ]]; then
-    bitrate=1500k
-  fi
-  if [[ -n $limitsize ]]; then
-    fileoptions="-fs $limitsize"
+if [[ -n $quality ]]; then
+  qualityoption="-qscale $(((100-100) * 10 / 33 + 1))"
+fi
+
+if [[ -z $limitsize && -z $bitrate && -z $quality ]]; then
+  bitrate=1500k
+fi
+if [[ -n $limitsize ]]; then
+  fileoptions="-fs $limitsize"
+else
+  fileoptions="-b $bitrate"
+fi
+
+if [[ -n $filters ]]; then
+  vf="-vf \"$filters\""
+fi
+
+if [[ -z $screengrab ]]; then
+  screengrab=0
+fi
+
+videoLength=$(mplayer -identify -frames 0 -vo null -nosound $input 2>&1 | awk -F= '/LENGTH/{print $2}')
+videoLength=$(printf "%.0f" $videoLength)
+if [[ x = "${screengrab::1}" ]]; then # capture this many images from the video, spaced equally
+  grabLimit=${screengrab:1}
+  grabInterval=$(($videoLength / $grabLimit))
+elif [[ '+' = "${screengrab::1}" ]]; then # capture images every n seconds
+  grabInterval=${screengrab:1}
+  grabLimit=$((videoLength / $grabInterval))
+else # capture just one image, at the given time
+  grabLimit=1
+  grabInterval=$screengrab
+fi
+
+if [[ -z $outputDir ]]; then
+  outputDir="$(dirname "$input")/web-ready-video"
+else
+  outputDir="$(dirname "$outputDir")/$(basename "$outputDir")"
+fi
+
+mkdir -p "$outputDir"
+
+inputName="$(basename "$input")"
+bareName="${inputName/.*/}"
+
+output="$outputDir/$bareName"
+motion="-g 30"
+
+# adapted from a Windows batch file: http://johndyer.name/ffmpeg-settings-for-html5-codecs-h264mp4-theoraogg-vp8webm/
+
+echo "jpeg ($grabLimit screengrabs ${grabInterval} seconds apart)"
+
+for ((n=0;n<$grabLimit;n++)); do
+  if [[ $grabLimit -gt 1 ]]; then
+    count="_$(pad 4 $(($n + 1)) 0)"
   else
-    fileoptions="-b $bitrate"
+    count=
   fi
-
-  if [[ -n $filters ]]; then
-    vf="-vf \"$filters\""
-  fi
-
-  if [[ -z $screengrab ]]; then
-    screengrab=0
-  fi
-
-  videoLength=$(mplayer -identify -frames 0 -vo null -nosound $input 2>&1 | awk -F= '/LENGTH/{print $2}')
-  videoLength=$(printf "%.0f" $videoLength)
-  if [[ x = "${screengrab::1}" ]]; then # capture this many images from the video, spaced equally
-    grabLimit=${screengrab:1}
-    grabInterval=$(($videoLength / $grabLimit))
-  elif [[ '+' = "${screengrab::1}" ]]; then # capture images every n seconds
-    grabInterval=${screengrab:1}
-    grabLimit=$((videoLength / $grabInterval))
-  else # capture just one image, at the given time
-    grabLimit=1
-    grabInterval=$screengrab
-  fi
-
-  if [[ -z $outputDir ]]; then
-    outputDir="$(dirname "$input")/vid2web"
-  else
-    outputDir="$(dirname "$outputDir")/$(basename "$outputDir")"
-  fi
-
-  mkdir -p "$outputDir"
-
-  inputName="$(basename "$input")"
-  bareName="${inputName/.*/}"
-
-  output="$outputDir/$bareName"
-  motion="-g 30"
-
-  # adapted from a Windows batch file: http://johndyer.name/ffmpeg-settings-for-html5-codecs-h264mp4-theoraogg-vp8webm/
-
-  echo "jpeg ($grabLimit screengrabs ${grabInterval} seconds apart)"
-
-  for ((n=0;n<$grabLimit;n++)); do
-    if [[ $grabLimit -gt 1 ]]; then
-      count="_$(pad 4 $(($n + 1)) 0)"
-    else
-      count=
-    fi
-    ffmpeg -i "$input" -ss $(($n * $grabInterval)) -vframes 1 -r 1 $sizeoption $vf -f image2 "$output$count.jpg" # DEBUG
-  done
-
-  if [[ yes != $grabOnly ]]; then
-    echo "mp4  (H.264 / ACC)"
-    # ffmpeg -i "$input" $fileoptions -c:v libx264 -vpre slow -vpre baseline                                           $motion $qualityoption $sizeoption $vf "$output.mp4"
-    ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
-    ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
-
-    echo "webm (VP8 / Vorbis)"
-    ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
-
-    echo "ogv  (Theora / Vorbis)"
-    ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
-  fi
+  ffmpeg -i "$input" -ss $(($n * $grabInterval)) -vframes 1 -r 1 $sizeoption $vf -f image2 "$output$count.jpg" # DEBUG
 done
+
+if [[ yes != $grabOnly ]]; then
+  echo "mp4  (H.264 / ACC)"
+  # ffmpeg -i "$input" $fileoptions -c:v libx264 -vpre slow -vpre baseline                                           $motion $qualityoption $sizeoption $vf "$output.mp4"
+  ffmpeg -y -i "$input" $fileoptions -c:v libx264 -pass 1 -an -f mp4                                               $motion $qualityoption $sizeoption $vf /dev/null
+  ffmpeg    -i "$input" $fileoptions -c:v libx264 -pass 2     -f mp4                                               $motion $qualityoption $sizeoption $vf "$output.mp4"
+
+  echo "webm (VP8 / Vorbis)"
+  ffmpeg -i "$input" $fileoptions -c:v libvpx                              -acodec libvorbis -ab 160000 -f webm    $motion $qualityoption $sizeoption $vf "$output.webm"
+
+  echo "ogv  (Theora / Vorbis)"
+  ffmpeg -i "$input" $fileoptions -c:v libtheora                           -acodec libvorbis -ab 160000            $motion $qualityoption $sizeoption $vf "$output.ogv"
+fi
